@@ -39,12 +39,14 @@ function App() {
       tenue, elements, expression, couleurs, style,
     } = form;
 
-    return `Illustration sur fond blanc d’un personnage ${genre ? genre.toLowerCase() : '[genre non précisé]'} nommé ${nom || '[Nom inconnu]'}, de type ${origine || '[Origine inconnue]'}, âgé de ${age || '[âge inconnu]'} ans. ` +
-      `Il/elle présente la description physique suivante : ${description || '[Description non précisée]'}. ` +
-      `${tenue ? `Il/elle porte : ${tenue}. ` : ''}` +
-      `${elements ? `Éléments distinctifs : ${elements}. ` : ''}` +
-      `${expression ? `Il/elle adopte l’expression ou l’attitude suivante : ${expression}. ` : ''}` +
-      `Utiliser une palette de couleurs ${couleurs || '[non précisée]'}, dans un style graphique ${style || '[non précisé]'}.`;
+    return `
+   Illustration détaillée et expressive sur fond blanc d’un personnage ${genre ? genre.toLowerCase() : 'humain'} nommé ${nom || 'sans nom'}, de type ${origine || 'mixte'}, âgé de ${age || 'vingtaine'} ans. 
+Il/elle présente la description physique suivante : ${description || 'de taille moyenne, corpulence athlétique, cheveux bruns courts et yeux clairs, avec un léger sourire aux lèvres.'}. 
+${tenue ? `Il/elle porte une tenue détaillée et texturée : ${tenue}. ` : ''}
+${elements ? `Éléments distinctifs et remarquables : ${elements}. ` : ''}
+${expression ? `Il/elle adopte l’expression ou l’attitude suivante, capturée de manière dynamique : ${expression}. ` : ''}
+Utiliser une palette de couleurs ${couleurs || 'vibrantes et contrastées'}, dans un style graphique ${style || 'illustration numérique de haute qualité, avec des lignes nettes et des ombres douces'}, haute résolution, chef d'oeuvre.
+`;
   };
 
   const handleSubmit = async (e) => {
