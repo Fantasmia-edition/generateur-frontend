@@ -57,7 +57,7 @@ function App() {
 
     try {
       console.log('Prompt envoyé :', prompt);
-      const response = await fetch('https://generateur-backend.onrender.com', {
+      const response = await fetch('https://generateur-backend.onrender.com/api/generate-image', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
