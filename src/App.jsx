@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'; // useRef n'est plus nécessaire pour le slider, mais peut être utile pour d'autres choses. On le garde pour l'instant.
 
 const images = [
-  '/images/image1.jpg',
-  '/images/image2.jpg',
-  '/images/image3.jpg',
+  '/images/image1.png',
+  '/images/image2.png',
+  '/images/image3.png',
   '/images/image4.jpg', 
   '/images/image5.jpg', 
   '/images/image6.jpg', 
