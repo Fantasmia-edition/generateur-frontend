@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'; // useRef n'est plus nécessaire pour le slider, mais peut être utile pour d'autres choses. On le garde pour l'instant.
 
-// Mettez ici les chemins de vos 6 images. Assurez-vous qu'elles existent dans public/images/.
 const images = [
   '/images/image1.jpg',
   '/images/image2.jpg',
@@ -9,6 +8,19 @@ const images = [
   '/images/image5.jpg', 
   '/images/image6.jpg', 
 ];
+
+// Ajoutez ceci quelque part en dehors de la fonction App, par exemple après la liste `images`
+
+const styleSynonyms = {
+  'Fantasy': 'fantastique, heroïc fantasy, médiéval fantastique, épique, mythologique',
+  'Réaliste': 'photographique, hyperréaliste, ultra-détaillé, réaliste, rendu photo',
+  'Cartoon': 'dessin animé, style bande dessinée, BD, animation, style Disney, Looney Tunes',
+  'Manga': 'anime, style japonais, shonen, shojo, dessin manga',
+  'Aquarelle': 'peinture à l\'eau, effet aquarelle, lavis, couleurs transparentes',
+  'Dessin au crayon': 'esquisse, croquis, graphite, fusain, crayonné, illustration au crayon',
+  // Ajoutez d'autres styles si vous en avez et leurs synonymes
+  'illustration numérique de haute qualité, avec des lignes nettes et des ombres douces': 'illustration vectorielle, art digital, rendu numérique, haute définition, rendu 3D' // Pour votre valeur par défaut
+};
 
 function App() {
   const [form, setForm] = useState({
@@ -27,13 +39,28 @@ function App() {
   const [generatedImage, setGeneratedImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const MAX_DAILY_GENERATIONS = 2; // <--- Définissez votre limite ici (ex: 5 générations par jour)
+  const [dailyGenerations, setDailyGenerations] = useState(0); // État pour le compteur actuel
+  const [backgroundType, setBackgroundType] = useState('white'); // 'white' ou 'context'
+  const [contextPrompt, setContextPrompt] = useState(''); // Pour le nouveau champ de contexte
 
-  // Ces états et ref ne sont plus nécessaires pour le slider automatique, car nous voulons une galerie statique.
-  // Vous pouvez les supprimer si vous êtes sûr de ne pas en avoir besoin ailleurs.
-  // const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  // const [loopCount, setLoopCount] = useState(0);
-  // const maxLoops = 3;
-  // const intervalRef = useRef(null);
+ // Hook useEffect pour initialiser le compteur au chargement de l'application
+  useEffect(() => {
+    const lastGenerationDate = localStorage.getItem('lastGenerationDate'); // Récupère la date de la dernière utilisation
+    const today = new Date().toDateString(); // Date d'aujourd'hui au format "Wed Jul 16 2025"
+
+    if (lastGenerationDate === today) {
+      // Si la date stockée est la même qu'aujourd'hui, on récupère le compteur existant
+      const count = parseInt(localStorage.getItem('dailyGenerationsCount') || '0', 10);
+      setDailyGenerations(count);
+    } else {
+      // Si c'est un nouveau jour ou qu'aucune date n'est stockée, on réinitialise le compteur
+      localStorage.setItem('lastGenerationDate', today); // Stocke la date d'aujourd'hui
+      localStorage.setItem('dailyGenerationsCount', '0'); // Réinitialise le compteur
+      setDailyGenerations(0); // Met à jour l'état React
+    }
+  }, []); // Le tableau vide [] signifie que cet effet ne s'exécute qu'une seule fois au montage du composant
+  // --- FIN : AJOUT DU COMPTEUR DE GÉNÉRATION ---
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -45,18 +72,49 @@ function App() {
       tenue, elements, expression, couleurs, style,
     } = form;
 
-    return `
-   Illustration détaillée et expressive sur fond blanc d’un personnage ${genre ? genre.toLowerCase() : 'humain'} nommé ${nom || 'sans nom'}, de type ${origine || 'mixte'}, âgé de ${age || 'vingtaine'} ans. 
-Il/elle présente la description physique suivante : ${description || 'de taille moyenne, corpulence athlétique, cheveux bruns courts et yeux clairs, avec un léger sourire aux lèvres.'}. 
-${tenue ? `Il/elle porte une tenue détaillée et texturée : ${tenue}. ` : ''}
-${elements ? `Éléments distinctifs et remarquables : ${elements}. ` : ''}
-${expression ? `Il/elle adopte l’expression ou l’attitude suivante, capturée de manière dynamique : ${expression}. ` : ''}
-Utiliser une palette de couleurs ${couleurs || 'vibrantes et contrastées'}, dans un style graphique ${style || 'illustration numérique de haute qualité, avec des lignes nettes et des ombres douces'}, haute résolution, chef d'oeuvre.
-`;
+    // --- DÉBUT : LOGIQUE MODIFIÉE POUR LE FOND ---
+    const backgroundClause = backgroundType === 'white' 
+      ? 'sur fond blanc' 
+      : (contextPrompt ? `dans le contexte suivant : ${contextPrompt}` : 'dans un environnement détaillé'); // Fallback si le contexte est vide
+    // --- FIN : LOGIQUE MODIFIÉE POUR LE FOND ---
+
+  // --- DÉBUT : MODIFICATION POUR LES SYNONYMES DE STYLE ---
+
+    // Récupère le style choisi ou le style par défaut
+    const actualStyle = style || 'illustration numérique de haute qualité, avec des lignes nettes et des ombres douces';
+    
+    // Récupère les synonymes associés au style. Si aucun n'est trouvé, utilise juste le style.
+    const reinforcedStyleTerms = styleSynonyms[actualStyle] ? `${actualStyle}, ${styleSynonyms[actualStyle]}` : actualStyle;
+
+    const finalStyling = `Utiliser une palette de couleurs ${couleurs || 'vibrantes et contrastées'}, dans un style graphique ${reinforcedStyleTerms}, haute résolution, chef d'oeuvre.`;
+    // Le terme `reinforcedStyleTerms` inclut maintenant le style original ET ses synonymes
+    // --- FIN : MODIFICATION POUR LES SYNONYMES DE STYLE ---
+
+    // La phrase de base du prompt incorpore maintenant backgroundClause
+    const basePrompt = `Illustration détaillée et expressive ${backgroundClause} d’un personnage ${genre ? genre.toLowerCase() : 'humain'} nommé ${nom || 'sans nom'}, de type ${origine || 'mixte'}, âgé de ${age || 'vingtaine'} ans.`;
+
+    const physicalDescription = description || 'de taille moyenne, corpulence athlétique, cheveux bruns courts et yeux clairs, avec un léger sourire aux lèvres.';
+    
+    // Joint les détails optionnels s'ils existent
+    const optionalDetails = [
+      tenue && `Il/elle porte une tenue détaillée et texturée : ${tenue}.`,
+      elements && `Éléments distinctifs et remarquables : ${elements}.`,
+      expression && `Il/elle adopte l’expression ou l’attitude suivante, capturée de manière dynamique : ${expression}.`
+    ].filter(Boolean).join(' '); // `.filter(Boolean)` enlève les éléments `false` ou `undefined`
+
+    return `${basePrompt} Il/elle présente la description physique suivante : ${physicalDescription}. ${optionalDetails} ${finalStyling}`;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // --- DÉBUT : VÉRIFICATION ET INCÉMENTATION DU COMPTEUR DANS handleSubmit ---
+    // Vérification de la limite AVANT de lancer la génération
+    if (dailyGenerations >= MAX_DAILY_GENERATIONS) {
+      setError(`Vous avez atteint la limite de ${MAX_DAILY_GENERATIONS} générations par jour.`);
+      return; // Empêche l'exécution du reste de la fonction
+    }
+    // --- FIN : VÉRIFICATION DE LA LIMITE ---
 
     const prompt = generatePrompt();
     setLoading(true);
@@ -79,6 +137,13 @@ Utiliser une palette de couleurs ${couleurs || 'vibrantes et contrastées'}, dan
 
       const data = await response.json();
       setGeneratedImage(data.imageBase64);
+
+      // --- DÉBUT : INCÉMENTATION DU COMPTEUR APRÈS UNE GÉNÉRATION RÉUSSIE ---
+      const newCount = dailyGenerations + 1;
+      setDailyGenerations(newCount); // Met à jour l'état React
+      localStorage.setItem('dailyGenerationsCount', newCount.toString()); // Met à jour localStorage
+      // --- FIN : INCÉMENTATION DU COMPTEUR ---
+
     } catch (err) {
       setError(err.message);
     } finally {
@@ -145,13 +210,62 @@ Utiliser une palette de couleurs ${couleurs || 'vibrantes et contrastées'}, dan
           <form onSubmit={handleSubmit} className="w-1/2 space-y-6">
             <h1 className="text-3xl font-bold mb-6">À quoi ressemble votre personnage</h1>
 
+{/* --- DÉBUT : CHOIX DU TYPE DE FOND --- */}
+            <div className="mb-6">
+                <label className="block font-bold mb-2">Type de fond</label>
+                <div className="flex space-x-4">
+                    <label className="inline-flex items-center">
+                        <input
+                            type="radio"
+                            className="form-radio text-[#ddce9d] h-4 w-4"
+                            name="backgroundType"
+                            value="white"
+                            checked={backgroundType === 'white'}
+                            onChange={() => setBackgroundType('white')}
+                        />
+                        <span className="ml-2 text-white">Fond blanc</span>
+                    </label>
+                    <label className="inline-flex items-center">
+                        <input
+                            type="radio"
+                            className="form-radio text-[#ddce9d] h-4 w-4"
+                            name="backgroundType"
+                            value="context"
+                            checked={backgroundType === 'context'}
+                            onChange={() => setBackgroundType('context')}
+                        />
+                        <span className="ml-2 text-white">En contexte</span>
+                    </label>
+                </div>
+            </div>
+            {/* --- FIN : CHOIX DU TYPE DE FOND --- */}
+
+            {/* --- DÉBUT : CHAMP DE CONTEXTE (AFFICHÉ CONDITIONNELLEMENT) --- */}
+            {backgroundType === 'context' && (
+                <div className="mb-6">
+                    <label htmlFor="contextPrompt" className="block font-bold mb-1">
+                        Décrivez le contexte (lieu, ambiance, époque...)
+                    </label>
+                    <textarea
+                        id="contextPrompt"
+                        name="contextPrompt"
+                        value={contextPrompt}
+                        onChange={(e) => setContextPrompt(e.target.value)}
+                        rows={3}
+                        className="w-full bg-black text-white border border-[#ddce9d] rounded-lg px-4 py-2 focus:outline-none hover:border-[#ddce9d]"
+                        placeholder="Ex: Dans une ruelle sombre de Londres victorien, sous une pluie battante et des lampadaires à gaz, ambiance mystérieuse."
+                    />
+                </div>
+            )}
+            {/* --- FIN : CHAMP DE CONTEXTE --- */}
+
             {[
-              { label: 'Prénom et nom', name: 'nom', type: 'text' },
-              { label: 'Description physique', name: 'description', type: 'textarea' },
-              { label: 'Tenue vestimentaire (optionnel)', name: 'tenue', type: 'text' },
-              { label: 'Éléments distinctifs', name: 'elements', type: 'text' },
-              { label: 'Expression ou attitudes', name: 'expression', type: 'text' },
-            ].map(({ label, name, type }) => (
+              { label: 'Prénom', name: 'nom', type: 'text', placeholder: 'Ex: Elara Veldon' },
+              { label: 'Description physique', name: 'description', type: 'textarea', placeholder: 'Ex: Cheveux longs et argentés tressés, yeux vert émeraude, cicatrice fine sur la joue gauche, corpulence élancée.' },
+              { label: 'Tenue vestimentaire', name: 'tenue', type: 'text', placeholder: 'Ex: Armure de cuir sombre ornée de motifs celtiques, avec une cape rouge déchirée.' },
+              { label: 'Éléments distinctifs', name: 'elements', type: 'text', placeholder: 'Ex: Un collier en dent de dragon, une épée gravée à la garde complexe, des gants sans doigts.' },
+              { label: 'Expression ou attitudes', name: 'expression', type: 'text', placeholder: 'Ex: Regard déterminé et stoïque, posture de combat prête à l\'action.' },
+            ].map(({ label, name, type, placeholder }) => (
               <div key={name}>
                 <label htmlFor={name} className="block font-bold mb-1">{label}</label>
                 {type === 'textarea' ? (
@@ -162,6 +276,7 @@ Utiliser une palette de couleurs ${couleurs || 'vibrantes et contrastées'}, dan
                     onChange={handleChange}
                     rows={3}
                     className="w-full bg-black text-white border border-[#ddce9d] rounded-lg px-4 py-2 focus:outline-none hover:border-[#ddce9d]"
+                    placeholder={placeholder}
                   />
                 ) : (
                   <input
@@ -171,6 +286,7 @@ Utiliser une palette de couleurs ${couleurs || 'vibrantes et contrastées'}, dan
                     value={form[name]}
                     onChange={handleChange}
                     className="w-full bg-black text-white border border-[#ddce9d] rounded-lg px-4 py-2 focus:outline-none hover:border-[#ddce9d]"
+                    placeholder={placeholder}
                   />
                 )}
               </div>
@@ -186,7 +302,7 @@ Utiliser une palette de couleurs ${couleurs || 'vibrantes et contrastées'}, dan
                   onChange={handleChange}
                   className="w-full bg-black text-white border border-[#ddce9d] rounded-lg px-4 py-2 hover:border-[#ddce9d] focus:outline-none"
                 >
-                  <option value="">-- Choisir --</option>
+                  <option value=""disabled>-- Choisir --</option>
                   <option>Masculin</option>
                   <option>Féminin</option>
                   <option>Non Binaire</option>
@@ -216,7 +332,7 @@ Utiliser une palette de couleurs ${couleurs || 'vibrantes et contrastées'}, dan
                 onChange={handleChange}
                 className="w-full bg-black text-white border border-[#ddce9d] rounded-lg px-4 py-2 hover:border-[#ddce9d] focus:outline-none"
               >
-                <option value="">-- Choisir --</option>
+                <option value=""disabled>-- Choisir --</option>
                 <option>Caucasien</option>
                 <option>Noir</option>
                 <option>Asiatique</option>
@@ -241,7 +357,7 @@ Utiliser une palette de couleurs ${couleurs || 'vibrantes et contrastées'}, dan
                   onChange={handleChange}
                   className="w-full bg-black text-white border border-[#ddce9d] rounded-lg px-4 py-2 hover:border-[#ddce9d] focus:outline-none"
                 >
-                  <option value="">-- Choisir --</option>
+                  <option value=""disabled>-- Choisir --</option>
                   <option>Tons chauds</option>
                   <option>Tons froids</option>
                   <option>Pastel</option>
@@ -258,7 +374,7 @@ Utiliser une palette de couleurs ${couleurs || 'vibrantes et contrastées'}, dan
                   onChange={handleChange}
                   className="w-full bg-black text-white border border-[#ddce9d] rounded-lg px-4 py-2 hover:border-[#ddce9d] focus:outline-none mb-6"
                 >
-                  <option value="">-- Choisir --</option>
+                  <option value=""disabled>-- Choisir --</option>
                   <option>Fantasy</option>
                   <option>Réaliste</option>
                   <option>Cartoon</option>
@@ -275,15 +391,27 @@ Utiliser une palette de couleurs ${couleurs || 'vibrantes et contrastées'}, dan
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Génération en cours…
+                <p className="mt-2">Génération en cours…</p> {/* AJOUTÉ : P pour le texte de base */}
+                <p className="text-sm text-gray-400 text-center mt-2"> {/* NOUVEAU MESSAGE */}
+                  (Version Bêta : les visuels peuvent parfois différer du prompt. Merci de votre compréhension !)
+                </p>
               </div>
             )}
             {error && <p className="text-red-500">Erreur : {error}</p>}
 
+             {/* --- DÉBUT : AFFICHAGE DU COMPTEUR DE GÉNÉRATION --- */}
+            {/* On l'affiche seulement si on n'est pas en train de charger et s'il n'y a pas d'erreur */}
+            {!loading && !error && (
+              <p className="text-sm text-gray-400 text-center mt-2">
+                Générations restantes aujourd'hui : {MAX_DAILY_GENERATIONS - dailyGenerations} / {MAX_DAILY_GENERATIONS}
+              </p>
+            )}
+            {/* --- FIN : AFFICHAGE DU COMPTEUR DE GÉNÉRATION --- */}
+
             <button
               type="submit"
               className="w-full bg-[#ddce9d] text-black font-semibold py-3 px-6 rounded-lg hover:opacity-90 transition mt-10"
-              disabled={loading}
+              disabled={loading || dailyGenerations >= MAX_DAILY_GENERATIONS}
             >
               Générer l'image
             </button>
